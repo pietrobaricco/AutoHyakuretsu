@@ -14,8 +14,6 @@ class Macro(ABC):
     templates: list[Template] = []
 
     def __init__(self, app, name, templates_dir):
-        # AutoHyakuretsu
-
         self.app = app
         self.name = name
         self.templates_dir = templates_dir
@@ -53,7 +51,7 @@ class Macro(ABC):
         m = self.get_first_match(matches1, name)
         return m
 
-    def write_text(text, interval=0.1, wait_ms=0):
+    def write_text(self, text, interval=0.1, wait_ms=0):
         QTimer.singleShot(200, lambda: pyautogui.typewrite(text, interval=interval))
         NonBlockingDelay.wait(wait_ms)
 

@@ -8,7 +8,7 @@ import pyautogui  # Import pyautogui for mouse control
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidgetItem, QWidget, QVBoxLayout, QCheckBox, QPushButton, \
-    QLabel, QLineEdit
+    QLabel, QLineEdit, QTextEdit
 
 from libs.capture import capture_screen
 from libs.delay import NonBlockingDelay
@@ -18,7 +18,7 @@ from ui.mainWindow import Ui_MainWindow
 
 
 class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
-    macros: list[Macro] = []
+    macros: dict[str, Macro] = []
     sprites: dict = {}
 
     def __init__(self):
@@ -27,7 +27,7 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
         self.script_directory = os.path.dirname(os.path.abspath(__file__))
         self.macros_dir = self.script_directory + "/macros"
         self.sounds_dir = self.script_directory + "/sounds"
-        self.macros = []
+        self.macros = {}
         self.running = False
         self.timer_interval = 10
         self.loop_rate = 5000
@@ -78,7 +78,7 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
         table = self.ui_form.macrosTable
         table.setRowCount(len(macros))
 
-        self.macros = []
+        self.macros = {}
 
         row = 0
         for macro in macros:
@@ -100,7 +100,7 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
                 class_ = getattr(module, macro_name)
                 instance = class_(self, macro_name, os.path.join(self.macros_dir, module_name, 'templates'))
                 print(f"Instantiated {macro_name}: {instance.name}")
-                self.macros.append(instance)
+                self.macros[module_name + '.' + macro_name] = instance
 
                 # Create StartStopButton for start/stop
                 button = StartStopButton(instance, self)
@@ -156,8 +156,11 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
                 screenshot_cv = capture_screen()
 
                 for row in selected_rows:
-                    macro = self.macros[row]
-                    print(f"Running macro {macro.name}")
+                    # get the field 'name' from the row
+                    macro_module = self.ui_form.macrosTable.item(row, 1).text()
+                    macro_name = self.ui_form.macrosTable.item(row, 2).text()
+                    macro = self.macros[macro_module + '.' + macro_name]
+                    print(f"Running macro {macro_module}.{macro_name}")
                     macro.run(screenshot_cv)
 
         self.loop_countdown -= self.timer_interval
@@ -190,6 +193,9 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
     def run_macro_single(self, macro):
         window = QMainWindow()
         window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
+        # resize window to 50% of screen
+        window.resize(window.screen().size() * 0.5)
+
         central_widget = QWidget()
         window.setCentralWidget(central_widget)
         layout = QVBoxLayout()
@@ -210,7 +216,11 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
             label = QLabel(param_name)
             layout.addWidget(label)
 
-            input_field = QLineEdit()
+            if param_name == 'prompt':
+                input_field = QTextEdit()
+            else:
+                input_field = QLineEdit()
+
             layout.addWidget(input_field)
 
             input_fields[param_name] = input_field
@@ -220,7 +230,8 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
 
         def clicked():
             # create a dictionary of input fields values as returned by their text() method
-            values = {k: v.text() for k, v in input_fields.items()}
+            # text() may not exits, so use toPlainText() for QTextEdit
+            values = {k: v.toPlainText() if hasattr(v, 'toPlainText') else v.text() for k, v in input_fields.items()}
 
             macro.run(capture_screen(), values)
             window.close()
