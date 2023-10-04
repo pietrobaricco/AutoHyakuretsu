@@ -1,0 +1,3 @@
+@echo off
+echo making wndows executable...
+python -m PyInstaller auto_hyakuretsu.py -F --onefile --add-data "sprites;sprites" --add-data "sounds;sounds" --add-data "macros;macros"
