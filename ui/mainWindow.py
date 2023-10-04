@@ -9,12 +9,9 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QTableWidget
 
 
 class Ui_MainWindow(object):
-    macrosTable: QTableWidget
-
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1004, 867)
@@ -90,4 +87,4 @@ class Ui_MainWindow(object):
         self.pollRateLabel.setText(_translate("MainWindow", "Poll rate (ms)"))
         self.soundCheckbox.setText(_translate("MainWindow", "Sound"))
         self.lolCheckbox.setText(_translate("MainWindow", "Hokkto"))
-        self.toggleButton.setText(_translate("MainWindow", "Start"))
+        self.toggleButton.setText(_translate("MainWindow", "Loop"))

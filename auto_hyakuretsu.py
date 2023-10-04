@@ -6,7 +6,9 @@ import time
 
 import pyautogui  # Import pyautogui for mouse control
 from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidgetItem, QWidget, QVBoxLayout, QCheckBox
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidgetItem, QWidget, QVBoxLayout, QCheckBox, QPushButton, \
+    QLabel, QLineEdit
 
 from libs.capture import capture_screen
 from libs.delay import NonBlockingDelay
@@ -50,12 +52,13 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
         form.pollRate.textChanged.connect(self.update_model_from_ui)
 
         table = form.macrosTable
-        table.setColumnCount(4)
-        table.setHorizontalHeaderLabels(["active", "Module", "Macro", "run_nr"])
+        table.setColumnCount(5)
+        table.setHorizontalHeaderLabels(["active", "Module", "Macro", "run_nr", "run"])
         table.setColumnWidth(0, 70)
         table.setColumnWidth(1, 300)
         table.setColumnWidth(2, 300)
         table.setColumnWidth(3, 150)
+        table.setColumnWidth(4, 50)
 
         table.setSortingEnabled(True)
         table.sortByColumn(0, Qt.AscendingOrder)  # Sort column 0 in ascending order
@@ -99,7 +102,22 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
                 print(f"Instantiated {macro_name}: {instance.name}")
                 self.macros.append(instance)
 
+                # Create StartStopButton for start/stop
+                button = StartStopButton(instance, self)
+
+                # Create custom item and set it as the cell widget
+                table.setCellWidget(row, 4, button)
+
             row += 1
+
+    def get_row_from_button(self, button):
+        table = self.centralWidget().layout().itemAt(0).widget()
+        for row in range(table.rowCount()):
+            for col in range(table.columnCount()):
+                widget = table.cellWidget(row, col)
+                if isinstance(widget, StartStopButton) and widget == button:
+                    return row
+        return -1
 
     def update_model_from_ui(self):
         self.loop_rate = int(self.ui_form.pollRate.text())
@@ -120,7 +138,7 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
 
     def refresh_ui(self):
         # set the label of the button according to running status
-        self.ui_form.toggleButton.setText("Stop" if self.running else "Start")
+        self.ui_form.toggleButton.setText("Stop" if self.running else "Loop")
         # set the progress bar to the next poll
         self.ui_form.pollCountdown.setMaximum(self.loop_rate)
         self.ui_form.pollCountdown.setValue(self.loop_countdown)
@@ -145,9 +163,13 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
         self.loop_countdown -= self.timer_interval
         self.refresh_ui()
 
-    def click(self, x, y):
+    def click(self, x, y, nr_clicks=1):
         mouse_x, mouse_y = pyautogui.position()
-        pyautogui.click(x, y)
+
+        for i in range(nr_clicks):
+            pyautogui.click(x, y)
+            time.sleep(0.1)
+
         pyautogui.moveTo(mouse_x, mouse_y)
 
         print(f"Clicked at {x}, {y}")
@@ -165,6 +187,47 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
 
         return selected_rows
 
+    def run_macro_single(self, macro):
+        window = QMainWindow()
+        window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
+        central_widget = QWidget()
+        window.setCentralWidget(central_widget)
+        layout = QVBoxLayout()
+        central_widget.setLayout(layout)
+
+        label = QLabel("Enter values for required parameters:")
+        layout.addWidget(label)
+
+        parameters = macro.get_required_parameters()
+        if len(parameters) == 0:
+            macro.run(capture_screen(), {})
+            window.close()
+            return
+
+        input_fields = {}
+
+        for param_name in parameters:
+            label = QLabel(param_name)
+            layout.addWidget(label)
+
+            input_field = QLineEdit()
+            layout.addWidget(input_field)
+
+            input_fields[param_name] = input_field
+
+        submit_button = QPushButton("Run Macro")
+        layout.addWidget(submit_button)
+
+        def clicked():
+            # create a dictionary of input fields values as returned by their text() method
+            values = {k: v.text() for k, v in input_fields.items()}
+
+            macro.run(capture_screen(), values)
+            window.close()
+
+        submit_button.clicked.connect(lambda: clicked())
+
+        window.show()
 
 class CheckBoxCellWidget(QWidget):
     def __init__(self, parent=None):
@@ -173,6 +236,32 @@ class CheckBoxCellWidget(QWidget):
         self.checkbox = QCheckBox()
         self.layout.addWidget(self.checkbox)
         self.setLayout(self.layout)
+
+
+class StartStopButton(QPushButton):
+    macro: Macro = None
+
+    def __init__(self, macro: Macro, app):
+        super().__init__()
+        self.setIcon(QIcon.fromTheme('media-playback-start'))  # Built-in start icon
+        self.state = 0  # 0 indicates "Start"
+        self.macro = macro
+        self.clicked.connect(self.toggle_state)
+        self.app = app
+
+    def toggle_state(self):
+        if self.state == 0:
+            self.setIcon(QIcon.fromTheme('media-playback-stop'))  # Built-in stop icon
+            # set disabled to prevent double-clicking
+            self.setDisabled(True)
+            NonBlockingDelay.wait(100)
+            self.state = 1  # 1 indicates "Running"
+            self.app.run_macro_single(self.macro)
+            self.toggle_state()
+        else:
+            self.setIcon(QIcon.fromTheme('media-playback-start'))  # Built-in start icon
+            self.state = 0  # 0 indicates "Start"
+            self.setDisabled(False)
 
 
 if __name__ == "__main__":

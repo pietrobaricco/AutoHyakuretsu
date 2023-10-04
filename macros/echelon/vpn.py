@@ -5,7 +5,7 @@ from libs.macro import Macro
 
 
 class vpn(Macro):
-    def run(self, screenshot_cv):
+    def run(self, screenshot_cv, parameters={}):
         if self.search_and_click("forticlient_connect", screenshot_cv):
             print("VPN died at date " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 

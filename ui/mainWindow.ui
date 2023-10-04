@@ -125,7 +125,7 @@
         <item>
          <widget class="QPushButton" name="toggleButton">
           <property name="text">
-           <string>Start</string>
+           <string>Loop</string>
           </property>
          </widget>
         </item>

@@ -5,7 +5,7 @@ from libs.macro import Macro
 
 class settings_window(Macro):
 
-    def run(self, screenshot_cv):
+    def run(self, screenshot_cv, parameters={}):
         if not self.search_template("settings_win", screenshot_cv):
             if self.search_and_click("fedora_logo", screenshot_cv):
                 NonBlockingDelay.wait(500)
