@@ -3,6 +3,7 @@ import os
 import random
 import sys
 import time
+import openai
 
 import pyautogui  # Import pyautogui for mouse control
 from PyQt5.QtCore import QTimer, Qt
@@ -10,8 +11,10 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidgetItem, QWidget, QVBoxLayout, QCheckBox, QPushButton, \
     QLabel, QLineEdit, QTextEdit
 
-from libs.capture import capture_screen
+from libs.ai import bot
+from libs.capture import capture_screen, ocr_utils
 from libs.delay import NonBlockingDelay
+from libs.image import imageManipulator
 from libs.macro import search_macros, Macro
 from libs.sprite import load_sprites
 from ui.mainWindow import Ui_MainWindow
@@ -20,6 +23,9 @@ from ui.mainWindow import Ui_MainWindow
 class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
     macros: dict[str, Macro] = []
     sprites: dict = {}
+    image_manipulator: imageManipulator = None
+    ocr_utils: ocr_utils = None
+    bot: bot = None
 
     def __init__(self):
         super().__init__()
@@ -35,6 +41,9 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
         self.sound = False
         self.lol = False
         self.ui_form = Ui_MainWindow()
+        self.image_manipulator = imageManipulator()
+        self.ocr_utils = ocr_utils(self)
+        self.bot = bot()
         self.init_ui()
         self.update_ui_from_model()
         self.load_data()

@@ -3,7 +3,7 @@ import time
 import cv2
 import pyautogui
 
-from libs.capture import capture_screen, ocr
+from libs.capture import capture_screen
 from libs.delay import NonBlockingDelay
 from libs.macro import Macro
 
@@ -58,7 +58,7 @@ class ask_something(Macro):
             #cv2.namedWindow("answer", cv2.WINDOW_NORMAL)
             #cv2.imshow("answer", answer_cv2)
 
-            text, confidence = ocr(answer_cv2, 0, 0, answer_cv2.shape[1], answer_cv2.shape[0])
+            text, confidence = self.app.ocr_utils.ocr(answer_cv2, 0, 0, answer_cv2.shape[1], answer_cv2.shape[0])
 
             return text, confidence
         else:

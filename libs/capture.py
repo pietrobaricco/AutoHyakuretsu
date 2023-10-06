@@ -1,13 +1,22 @@
+import logging
+import os
+import tempfile
+
 import cv2
 import numpy as np
 import tesserocr
 from PIL import Image
 
+from libs.delay import NonBlockingDelay
 
-def capture_screen(bbox=None):
+
+def capture_screen(bbox=None, delay_ms=0):
     import cv2
     import numpy as np
     from PIL import ImageGrab
+
+    if delay_ms > 0:
+        NonBlockingDelay.wait(delay_ms)
 
     # Capture the screen as an RGB image
     screenshot = ImageGrab.grab(bbox=bbox).convert('RGB')
@@ -68,43 +77,67 @@ def get_matches(templates, screenshot_cv):
 
     return template_matches
 
-def ocr(cv_image, x=0, y=0, w=0, h=0):
-    #api.SetVariable('load_system_dawg', 'false')
-    #api.SetVariable('load_freq_dawg', 'false')
+class ocr_utils:
 
-    api = tesserocr.PyTessBaseAPI(psm=6)  # Use psm=6 for multiline text
+    def __init__(self, app):
+        self.app = app
+        self.apis = {}
 
-    # Crop the image based on the specified coordinates and dimensions
-    cropped = cv_image[y:y + h, x: x + w]
-    # Convert the cropped image to grayscale
-    img2gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+    def ocr(self, cv_image, x=0, y=0, w=0, h=0, psm=6, threshold=80):
+        #api.SetVariable('load_system_dawg', 'false')
+        #api.SetVariable('load_freq_dawg', 'false')
 
-    # Apply adaptive thresholding to create a binary image
-    _, thresholded = cv2.threshold(img2gray, 80, 255, cv2.THRESH_BINARY)
-    _, inverted_thresholded = cv2.threshold(img2gray, 80, 255, cv2.THRESH_BINARY_INV)
+        api = self.apis.get(psm, None)
+        if api is None:
+            api = tesserocr.PyTessBaseAPI(psm=psm)  # Use psm=6 for multiline text
+            self.apis[psm] = api
 
-    # Create a PIL Image from the thresholded image
-    im_pil = Image.fromarray(thresholded)
+        # Crop the image based on the specified coordinates and dimensions
+        cropped = cv_image[y:y + h, x: x + w]
+        # Convert the cropped image to grayscale
+        img2gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
 
-    # Set the image for OCR processing
-    api.SetImage(im_pil)
+        # if the vertical resolution is too low, we need to upscale the image
+        if img2gray.shape[0] < 50:
+            original_level = logging.getLogger().getEffectiveLevel()
+            # Set the logging level to suppress messages (e.g., WARNING)
+            logging.getLogger().setLevel(logging.WARNING)
+            # Code where you want to suppress log messages
+            img2gray = self.app.image_manipulator.upscale_gray_4x(img2gray)
+            # Restore the original logging level
+            logging.getLogger().setLevel(original_level)
 
-    # Perform OCR on the image with line breaks
-    ocred_text = api.GetUTF8Text()
+        if(threshold != 0):
+            # Apply adaptive thresholding to create a binary image
+            _, thresholded = cv2.threshold(img2gray, threshold, 255, cv2.THRESH_BINARY)
+            _, inverted_thresholded = cv2.threshold(img2gray, threshold, 255, cv2.THRESH_BINARY_INV)
+        else:
+            thresholded = img2gray
+            inverted_thresholded = img2gray
 
-    # Get confidence scores for individual words (optional)
-    confidence = api.AllWordConfidences()
-    confidence = confidence[0] if len(confidence) >= 1 else -1
 
-    # make the same for inverted image
-    im_pil = Image.fromarray(inverted_thresholded)
-    api.SetImage(im_pil)
-    ocred_text_inv = api.GetUTF8Text()
-    confidence_inv = api.AllWordConfidences()
-    confidence_inv = confidence_inv[0] if len(confidence_inv) >= 1 else -1
+        # Create a PIL Image from the thresholded image
+        im_pil = Image.fromarray(thresholded)
 
-    # Return the best result
-    if confidence > confidence_inv:
-        return ocred_text, confidence
-    else:
-        return ocred_text_inv, confidence_inv
+        # Set the image for OCR processing
+        api.SetImage(im_pil)
+
+        # Perform OCR on the image with line breaks
+        ocred_text = api.GetUTF8Text()
+
+        # Get confidence scores for individual words (optional)
+        confidence = api.AllWordConfidences()
+        confidence = confidence[0] if len(confidence) >= 1 else -1
+
+        # make the same for inverted image
+        im_pil = Image.fromarray(inverted_thresholded)
+        api.SetImage(im_pil)
+        ocred_text_inv = api.GetUTF8Text()
+        confidence_inv = api.AllWordConfidences()
+        confidence_inv = confidence_inv[0] if len(confidence_inv) >= 1 else -1
+
+        # Return the best result
+        if confidence > confidence_inv:
+            return ocred_text, confidence
+        else:
+            return ocred_text_inv, confidence_inv

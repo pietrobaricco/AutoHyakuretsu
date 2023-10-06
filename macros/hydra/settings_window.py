@@ -1,4 +1,4 @@
-from libs.capture import capture_screen, ocr
+from libs.capture import capture_screen
 from libs.delay import NonBlockingDelay
 from libs.macro import Macro
 
@@ -10,7 +10,7 @@ class settings_window(Macro):
             fedora_logo = self.search_template("fedora_logo", screenshot_cv)
             if fedora_logo:
                 print("Found the fedora logo, clicking it")
-                text, confidence = ocr(screenshot_cv, fedora_logo['x'] + 30, fedora_logo['y'] - 86, 1200, 26)
+                text, confidence = self.app.ocr_utils.ocr(screenshot_cv, fedora_logo['x'] + 30, fedora_logo['y'] - 86, 1200, 26)
                 print(text, confidence)
                 self.app.click(fedora_logo['x'], fedora_logo['y'])
                 NonBlockingDelay.wait(500)

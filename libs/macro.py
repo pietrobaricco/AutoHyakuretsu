@@ -38,10 +38,12 @@ class Macro(ABC):
         matches = get_matches(filtered_arr, cv_image)
         return matches
 
-    def search_and_click(self, name, screenshot_cv, x_offset=0, y_offset=0, nr_clicks=1):
+    def search_and_click(self, name, screenshot_cv, x_offset=0, y_offset=0, nr_clicks=1, center=True):
         m = self.search_template(name, screenshot_cv)
         if m:
-            self.app.click(m['x'] + x_offset, m['y'] + y_offset, nr_clicks)
+            cx = m['center_x'] if center else m['x']
+            cy = m['center_y'] if center else m['y']
+            self.app.click(cx + x_offset, cy + y_offset, nr_clicks)
             print(name + "found at date " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
             return m
         return False
@@ -59,7 +61,7 @@ def search_macros(directory):
     macros = []
     for filename in os.listdir(directory):
         filepath = os.path.join(directory, filename)
-        if os.path.isdir(filepath):
+        if os.path.isdir(filepath) and not filename == "libs":
             print(f"Loading and executing modules in {filename} directory:")
             # recursively load macros in subdirectories
             macros += search_macros(filepath)
