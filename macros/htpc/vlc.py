@@ -19,7 +19,7 @@ class vlc(Macro):
                 print("search area found")
 
                 # dump some text in the search area with pyautogui, with 100 ms delay before starting
-                self.write_text(parameters['search_string'], wait_ms=500)
+                self.app.peon.write_text(parameters['search_string'], wait_ms=500)
                 screenshot_cv = capture_screen()
 
                 if self.search_and_click("vlc_app", screenshot_cv):

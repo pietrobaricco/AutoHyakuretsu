@@ -6,6 +6,7 @@ from libs.macro import Macro
 
 
 class aplan_utils:
+
     macro: Macro = None
 
     def __init__(self, macro):
@@ -19,7 +20,7 @@ class aplan_utils:
         cropped = screen_img[fy:fy1, fx:fx1]
         filter_icon_pos = self.macro.search_template("funnel-icon", cropped)
         if (filter_icon_pos):
-            print("found funnel")
+            print("found funnel icon at", filter_icon_pos)
             start_x = fx + filter_icon_pos['x'] + 15
             start_y = fy + filter_icon_pos['y'] - 3
 
@@ -72,6 +73,9 @@ class aplan_utils:
                 # trim the text removing any character not in a-z, A-Z, 0-9, or space, using regex
                 text = re.sub(r'[^a-zA-Z0-9 ]+', '', text)
 
+                #trim spaces from the beginning and end of the text
+                text = text.strip()
+
                 columns.append({"text": text, "offset": x, "confidence": confidence})
 
             print("Found", len(columns), "columns")
@@ -99,6 +103,7 @@ class aplan_utils:
                     cell_text, cell_confidence = self.macro.app.ocr_utils.ocr(cell_img, 0, 0, cell_img.shape[1],
                                                                               cell_img.shape[0], 7, threshold=0)
                     cell_text = re.sub(r'[^a-zA-Z0-9 ]+', '', cell_text)
+
                     if (cell_confidence > 70):
                         good_finds += 1
                     record[col["text"]] = cell_text
@@ -111,4 +116,4 @@ class aplan_utils:
 
             print("Found", row - 1, "rows")
 
-            return ret, columns
+            return ret, columns, {"x": start_x, "y": start_y}

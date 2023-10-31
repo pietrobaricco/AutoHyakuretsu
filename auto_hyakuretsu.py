@@ -7,17 +7,20 @@ import openai
 
 import pyautogui  # Import pyautogui for mouse control
 from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QTextCharFormat, QColor, QTextCursor
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidgetItem, QWidget, QVBoxLayout, QCheckBox, QPushButton, \
-    QLabel, QLineEdit, QTextEdit
+    QLabel, QLineEdit, QTextEdit, QHBoxLayout, QHeaderView, QSizePolicy
 
 from libs.ai import bot
 from libs.capture import capture_screen, ocr_utils
 from libs.delay import NonBlockingDelay
 from libs.image import imageManipulator
 from libs.macro import search_macros, Macro
+from libs.peon import Peon
 from libs.sprite import load_sprites
+from ui import chatLogWindow
 from ui.mainWindow import Ui_MainWindow
+from ui.chatLogWindow import Ui_ChatLogWindow
 
 
 class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
@@ -26,6 +29,9 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
     image_manipulator: imageManipulator = None
     ocr_utils: ocr_utils = None
     bot: bot = None
+    chat_window: QMainWindow = None
+    chat_log_ui: Ui_ChatLogWindow = None
+    peon: Peon = None
 
     def __init__(self):
         super().__init__()
@@ -40,10 +46,15 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
         self.loop_countdown = 0
         self.sound = False
         self.lol = False
+        self.filter_line_edits = []
+        self.filter = {}
         self.ui_form = Ui_MainWindow()
         self.image_manipulator = imageManipulator()
         self.ocr_utils = ocr_utils(self)
-        self.bot = bot()
+        self.bot = bot(self.handle_bot_response)
+        #self.bot.autogen_test_local()
+        #self.bot.autogen_test()
+        self.peon = Peon()
         self.init_ui()
         self.update_ui_from_model()
         self.load_data()
@@ -62,22 +73,81 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
 
         table = form.macrosTable
         table.setColumnCount(5)
-        table.setHorizontalHeaderLabels(["active", "Module", "Macro", "run_nr", "run"])
-        table.setColumnWidth(0, 70)
-        table.setColumnWidth(1, 300)
-        table.setColumnWidth(2, 300)
-        table.setColumnWidth(3, 150)
-        table.setColumnWidth(4, 50)
+        header_labels = ["active", "Module", "Macro", "run_nr", "run"]
+        table.setHorizontalHeaderLabels(header_labels)
+        header = table.horizontalHeader()
+        #for col in range(table.columnCount()):
+        #    header.setSectionResizeMode(col, QHeaderView.Stretch)
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+
 
         table.setSortingEnabled(True)
-        table.sortByColumn(0, Qt.AscendingOrder)  # Sort column 0 in ascending order
 
+        # create a horizontal layout for the labels and line edits
+        layout = QHBoxLayout(self.ui_form.centralwidget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        for col, label in enumerate(["Module", "Macro"]):
+            # create a label and add it to the layout
+            label_widget = QLabel(label)
+            layout.addWidget(label_widget)
+            # create a line edit and add it to the layout
+            line_edit = QLineEdit(self)
+            line_edit.setPlaceholderText(f"Filter {label}")
+            # set self.filter[label] to the line edit, then call self.filter_table
+            line_edit.textChanged.connect(lambda text, label=label: self.filter.update({label: text}))
+            # add a delay before filtering the table
+            line_edit.textChanged.connect(lambda: QTimer.singleShot(10, self.filter_table))
+            layout.addWidget(line_edit)
+            # add a spacer to the layout
+            spacer = QWidget(self)
+            spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            layout.addWidget(spacer)
+
+
+        # add the layout to the main layout
+        self.ui_form.verticalLayout.addLayout(layout)
+
+        table.sortByColumn(0, Qt.AscendingOrder)  # Sort column 0 in ascending order
         # main loop timer
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.timer_action)
         self.timer.start(self.timer_interval)
 
+        self.toggle_chat_window()
+
         self.refresh_ui()
+
+    def filter_table(self):
+        print(self.filter)
+        for row in range(self.ui_form.macrosTable.rowCount()):
+            # get the row data as a dict
+            row_data = self.get_row_data_as_dict(self.ui_form.macrosTable, row)
+            # cycle self.filter
+            for key, value in self.filter.items():
+                # omit empty filter fields
+                if not value:
+                    continue
+                # if the value is not in the row data, hide the row
+                if value.lower() not in row_data[key].lower():
+                    self.ui_form.macrosTable.hideRow(row)
+                    break
+            else:
+                # if all values are in the row data, show the row
+                self.ui_form.macrosTable.showRow(row)
+
+    def get_row_data_as_dict(self, table_widget, row_number):
+        row_data = {}
+        for col in range(table_widget.columnCount()):
+            item = table_widget.item(row_number, col)
+            if item is not None:
+                row_data[table_widget.horizontalHeaderItem(col).text()] = item.text()
+        return row_data
 
     def load_data(self):
         self.sprites = load_sprites(self.script_directory + "/sprites", self.sounds_dir)
@@ -118,6 +188,54 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
                 table.setCellWidget(row, 4, button)
 
             row += 1
+
+
+        screenshot_cv = capture_screen()
+        if False:
+            address = self.macros['aplan.process_email'].run(screenshot_cv, {
+                "prompt" : """
+                Buongiorno Alessandro,
+    
+    Ho aggiunto in copia il collega Mario Baricco, Vostro referente per il merceologico richiesto.
+    Sarà compito suo darle seguito alla gentile richiesta
+    
+    Rimango a disposizione
+    A presto
+    
+    Lorenzo Fasolini 
+    
+    From: Alessandro Candriello <acandriello@pesstech.com> 
+    Sent: Tuesday, October 10, 2023 11:57 AM
+    To: Fasolini, Lorenzo <Lorenzo.Fasolini@we-online.com>
+    Subject: DipSwitch & Trimmer 
+    
+    CAUTION: External Mail!
+    Buongiorno Lorenzo,
+    
+    Le chiedo cortesia di quotarmi e fornirmi i tempi di consegna per:
+    
+    Dipswitch SMD passo 1.27mm 5 posizioni  416131160805                               Pz 1000
+    Dipswitch SMD passo 1.27mm 6 posizioni  416131160806                               Pz 1000
+    
+    Resto in attesa di suo riscontro, grazie.
+    
+    Best Regards
+    Alessandro Candriello
+    
+    PESS TECHNOLOGIES SRL
+    
+    Roma
+    Via di Grotta Perfetta, 367
+    00142 Roma
+     
+    Pess Tech Srl - Asti
+    Via Antica Dogana, 7
+    14100 Fraz. Quarto Inferiore - AT
+    T. 0141 293821
+    VAT IT 01510920059
+                """,
+                "notes" : ""
+            })
 
     def get_row_from_button(self, button):
         table = self.centralWidget().layout().itemAt(0).widget()
@@ -176,13 +294,13 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
         self.refresh_ui()
 
     def click(self, x, y, nr_clicks=1):
-        mouse_x, mouse_y = pyautogui.position()
+        #mouse_x, mouse_y = pyautogui.position()
 
         for i in range(nr_clicks):
             pyautogui.click(x, y)
             time.sleep(0.1)
 
-        pyautogui.moveTo(mouse_x, mouse_y)
+        #pyautogui.moveTo(mouse_x, mouse_y)
 
         print(f"Clicked at {x}, {y}")
 
@@ -202,8 +320,8 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
     def run_macro_single(self, macro):
         window = QMainWindow()
         window.setWindowFlags(window.windowFlags() | Qt.WindowStaysOnTopHint)
-        # resize window to 50% of screen
-        window.resize(window.screen().size() * 0.5)
+
+        window.resize(window.screen().size() * 0.3)
 
         central_widget = QWidget()
         window.setCentralWidget(central_widget)
@@ -222,20 +340,44 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
         input_fields = {}
 
         for param_name in parameters:
+            paramLayout = QHBoxLayout()
+            # the first column will contain labels and must be fixed width at 200px
             label = QLabel(param_name)
-            layout.addWidget(label)
+
+            fixedWidthWidget = QWidget()
+            fixedWidthWidget.setFixedWidth(100)
+
+            fixedWidthLayout = QHBoxLayout()
+            fixedWidthLayout.addWidget(label)
+
+            fixedWidthWidget.setLayout(fixedWidthLayout)
+
+            paramLayout.addWidget(fixedWidthWidget)
 
             if param_name == 'prompt':
                 input_field = QTextEdit()
             else:
                 input_field = QLineEdit()
 
-            layout.addWidget(input_field)
-
+            paramLayout.addWidget(input_field)
+            layout.addLayout(paramLayout)
             input_fields[param_name] = input_field
 
+        # add a stretchable space to the bottom of the layout
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        layout.addWidget(spacer)
+
         submit_button = QPushButton("Run Macro")
-        layout.addWidget(submit_button)
+        cancel_button = QPushButton("Cancel")
+
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(cancel_button)
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        button_layout.addWidget(spacer)
+        button_layout.addWidget(submit_button)
+        layout.addLayout(button_layout)
 
         def clicked():
             # create a dictionary of input fields values as returned by their text() method
@@ -247,7 +389,65 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
 
         submit_button.clicked.connect(lambda: clicked())
 
+        def cancel():
+            window.close()
+
+        cancel_button.clicked.connect(lambda: cancel())
+
         window.show()
+
+    def toggle_chat_window(self):
+
+        if self.chat_window:
+            self.chat_window.close()
+            self.chat_window = None
+            return
+
+        self.chat_window = QMainWindow()
+        self.chat_window.setWindowFlags(self.chat_window.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.chat_window.resize(self.chat_window.screen().size() * 0.5)
+
+        # Create an instance of Ui_ChatLogWindow
+        self.chat_log_ui = Ui_ChatLogWindow()
+
+        # Call the setupUi method of chat_log_ui to set up the user interface
+        self.chat_log_ui.setupUi(self.chat_window)
+
+        # Set the window title
+        self.chat_window.setWindowTitle("Chat Log")
+
+        # Show the window
+        self.chat_window.show()
+
+    def print_colored_text(self, text, color='yellow'):
+        if self.chat_window is None:
+            return
+
+        cursor = self.chat_log_ui.chatLog.textCursor()
+        format = QTextCharFormat()
+        # Set the text color
+        format.setForeground(QColor(color))
+        # Move the cursor to the end of the document
+        cursor.movePosition(QTextCursor.End)
+        # Apply the format to the cursor
+        cursor.setCharFormat(format)
+        # Insert the text with the applied format
+        cursor.insertText(text + '\n')
+
+    def handle_bot_response(self, chat_log):
+        last_log = chat_log[-1]
+        if 'question' in last_log:
+            self.print_colored_text(last_log['question'], 'yellow')
+        if 'answer' in last_log:
+            self.print_colored_text(last_log['answer'], 'red')
+
+    def closeEvent(self, event):
+        # Close all child windows when the main window is closed
+
+        if self.chat_window:
+            self.chat_window.close()
+
+        event.accept()
 
 class CheckBoxCellWidget(QWidget):
     def __init__(self, parent=None):
@@ -286,6 +486,8 @@ class StartStopButton(QPushButton):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+
     window = AutoHyakuretsu()
+
     window.show()
     sys.exit(app.exec_())

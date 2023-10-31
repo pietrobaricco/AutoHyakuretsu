@@ -5,7 +5,7 @@ from abc import abstractmethod, ABC
 import pyautogui
 from PyQt5.QtCore import QTimer
 
-from libs.capture import get_matches
+from libs.capture import get_matches, capture_screen
 from libs.delay import NonBlockingDelay
 from libs.png_templates import Template, load_templates
 
@@ -53,9 +53,17 @@ class Macro(ABC):
         m = self.get_first_match(matches1, name)
         return m
 
-    def write_text(self, text, interval=0.1, wait_ms=0):
-        QTimer.singleShot(200, lambda: pyautogui.typewrite(text, interval=interval))
-        NonBlockingDelay.wait(wait_ms)
+    def wait_for_template(self, name, timeout=60):
+        total_time = 0
+        while total_time < timeout:
+            screenshot_cv = capture_screen(delay_ms=500)
+            m = self.search_template(name, screenshot_cv)
+            if m:
+                return m, screenshot_cv
+            total_time += 0.5
+            print("Waiting for " + name + "...")
+        return None, screenshot_cv
+
 
 def search_macros(directory):
     macros = []

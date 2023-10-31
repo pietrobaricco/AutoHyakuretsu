@@ -18,7 +18,7 @@ class ask_something(Macro):
         m = self.search_and_click("send-a-message", screenshot_cv, 20)
         if m:
             NonBlockingDelay.wait(200)
-            self.write_text(prompt + "\n", interval=0.02, wait_ms=0)
+            self.app.peon.write_text(prompt + "\n", interval=0.02, wait_ms=0)
 
             while True:
                 NonBlockingDelay.wait(2000)
