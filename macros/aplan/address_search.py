@@ -86,7 +86,7 @@ class address_search(Macro):
                             print("Found matching address at row " + str(matching_address['row_number']))
                             self.app.click(funnel_pos['x'] + 100, funnel_pos['y'] + 10 + 16 * matching_address['row_number'])
                             NonBlockingDelay.wait(30)
-                            pyautogui.press('enter')
+                            self.app.peon.enter()
 
                 address_ok, screenshot_cv = self.wait_for_template("address-page-ok")
 
