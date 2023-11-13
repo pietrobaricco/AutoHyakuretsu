@@ -43,7 +43,7 @@ class offer_add_line(Macro):
                     row_nr_int = int(matching_address['row_number'])
                     self.app.click(funnel_pos['x'] + 100, funnel_pos['y'] + 10 + 16 * row_nr_int)
                     NonBlockingDelay.wait(30)
-                    pyautogui.press('enter')
+                    self.app.peon.enter()
 
                     screenshot_cv = capture_screen(delay_ms=2000)
                     blocked = self.search_template("article-blocked", screenshot_cv)

@@ -41,7 +41,7 @@ class new_offer(Macro):
                     print("NEW OFFER: Found matching address at row " + str(matching_address['row_number']))
                     self.app.click(funnel_pos['x'] + 100, funnel_pos['y'] + 10 + 16 * matching_address['row_number'])
                     NonBlockingDelay.wait(30)
-                    pyautogui.press('enter')
+                    self.app.peon.enter()
                     screenshot_cv = capture_screen(delay_ms=5000)
 
                     if self.search_template("select-delivery-address", screenshot_cv):
