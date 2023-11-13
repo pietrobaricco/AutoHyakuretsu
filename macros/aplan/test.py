@@ -2,15 +2,17 @@ import pyautogui
 
 from libs.capture import capture_screen
 from libs.macro import Macro
+from macros.aplan.libs.aplan import aplan_utils
 
 
 class test(Macro):
     def run(self, screenshot_cv, parameters={}):
 
-        m = self.search_template("address-search-multi", screenshot_cv) \
-            or self.search_template("address-search-multi-2", screenshot_cv) \
-            or self.search_template("address-search-multi-3", screenshot_cv)
+        aplan = aplan_utils(self)
 
-        # matches = r = self.search_templates(screenshot_cv, ["address-search-multi", "address-search-multi-2", "address-search-multi-3"])
-        print(m)
+        m = self.search_template("table-marker-1", screenshot_cv)
+
+        rows, cols, funnel_pos = aplan.get_table_rows(screenshot_cv, m['x'], m['y'], m['x'] + 100, m['y'] + 200)
+
+        print(self.app.bot.readableTable(cols, rows))
 

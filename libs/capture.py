@@ -77,6 +77,7 @@ def get_matches(templates, screenshot_cv):
 
     return template_matches
 
+
 class ocr_utils:
 
     def __init__(self, app):
@@ -84,18 +85,26 @@ class ocr_utils:
         self.apis = {}
 
     def ocr(self, cv_image, x=0, y=0, w=0, h=0, psm=6, threshold=80):
-        #api.SetVariable('load_system_dawg', 'false')
-        #api.SetVariable('load_freq_dawg', 'false')
 
         api = self.apis.get(psm, None)
         if api is None:
             api = tesserocr.PyTessBaseAPI(psm=psm)  # Use psm=6 for multiline text
+
+            # disable dictionaries - improves detection of codes and numbers
+            api.SetVariable('load_system_dawg', 'false')
+            api.SetVariable('load_freq_dawg', 'false')
+
             self.apis[psm] = api
 
         # Crop the image based on the specified coordinates and dimensions
         cropped = cv_image[y:y + h, x: x + w]
+
         # Convert the cropped image to grayscale
         img2gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+
+        # if all the pixels are close to the color of the first pixel, then the image is probably blank
+        if np.allclose(img2gray, img2gray[0, 0], atol=5):
+            return "", -1
 
         # if the vertical resolution is too low, we need to upscale the image
         if img2gray.shape[0] < 50:
@@ -107,14 +116,19 @@ class ocr_utils:
             # Restore the original logging level
             logging.getLogger().setLevel(original_level)
 
-        if(threshold != 0):
+        padding = 15
+        img2gray = cv2.copyMakeBorder(img2gray, padding, padding, padding, padding, cv2.BORDER_REPLICATE)
+
+        # apply 1.2 gamma correction
+        img2gray = np.array(255 * (img2gray / 255) ** 1.2, dtype='uint8')
+
+        if (threshold != 0):
             # Apply adaptive thresholding to create a binary image
             _, thresholded = cv2.threshold(img2gray, threshold, 255, cv2.THRESH_BINARY)
             _, inverted_thresholded = cv2.threshold(img2gray, threshold, 255, cv2.THRESH_BINARY_INV)
         else:
             thresholded = img2gray
             inverted_thresholded = img2gray
-
 
         # Create a PIL Image from the thresholded image
         im_pil = Image.fromarray(thresholded)
@@ -125,19 +139,62 @@ class ocr_utils:
         # Perform OCR on the image with line breaks
         ocred_text = api.GetUTF8Text()
 
+        # to ascii
+        ocred_text = ocred_text.encode('ascii', 'ignore').decode('ascii')
+
         # Get confidence scores for individual words (optional)
         confidence = api.AllWordConfidences()
         confidence = confidence[0] if len(confidence) >= 1 else -1
 
         # make the same for inverted image
-        im_pil = Image.fromarray(inverted_thresholded)
-        api.SetImage(im_pil)
-        ocred_text_inv = api.GetUTF8Text()
-        confidence_inv = api.AllWordConfidences()
-        confidence_inv = confidence_inv[0] if len(confidence_inv) >= 1 else -1
+        if (threshold != 0):
+            im_pil = Image.fromarray(inverted_thresholded)
+            api.SetImage(im_pil)
+            ocred_text_inv = api.GetUTF8Text()
+            confidence_inv = api.AllWordConfidences()
+            confidence_inv = confidence_inv[0] if len(confidence_inv) >= 1 else -1
+        else:
+            ocred_text_inv = ""
+            confidence_inv = -1
+
+        #if max(confidence, confidence_inv) < 40:
+        #    #cv2.imshow("gray", img2gray)
+        #    return "", -1
 
         # Return the best result
         if confidence > confidence_inv:
-            return ocred_text, confidence
+            ret = ocred_text, confidence
         else:
-            return ocred_text_inv, confidence_inv
+            ret = ocred_text_inv, confidence_inv
+
+        if ret[0].find("acces") != -1:
+            # determine bg and fg colors (grays). bg is the most common color, fg is the second most common color
+            # sometimes the bg is darker than fg, so we need to invert the image
+
+            bgcolor = img2gray[0, 0]
+            if bgcolor > 128:
+                kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+                sharpened = cv2.filter2D(img2gray, -1, kernel)
+
+                # mask all non blackish pixels, set them white
+                _,thresh1 = cv2.threshold(sharpened,127,255,cv2.THRESH_BINARY)
+
+                blurred = cv2.GaussianBlur(sharpened, (3, 3), 0)
+
+
+                cv2.imshow("sharpened", sharpened)
+                cv2.imshow("thresh1", thresh1)
+                cv2.imshow("blurred", blurred)
+
+            # now we can threshold the image
+            #_, thresholded2 = cv2.threshold(img2gray, bgcolor-60, 255, cv2.THRESH_BINARY)
+            #cv2.imshow("thresholded", thresholded)
+            #cv2.imshow("thresholded2", thresholded2)
+            if 0:
+                for i in range(10):
+                    _t = 150 + 3*i
+                    _, thresholded = cv2.threshold(img2gray, _t, 255, cv2.THRESH_BINARY)
+                    cv2.imshow("thresholded" + str(_t), thresholded)
+
+
+        return ret

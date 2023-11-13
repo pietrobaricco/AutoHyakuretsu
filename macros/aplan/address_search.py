@@ -66,7 +66,7 @@ class address_search(Macro):
             if name_box:
                 print("Found the name search box")
                 self.app.click(name_box['center_x'], name_box['center_y'] + 20)
-                self.app.peon.write_text(parameters['name'], interval=0.02, wait_ms=0)
+                self.app.peon.write_text('%' + parameters['name'] + '%', interval=0.02, wait_ms=0)
                 self.app.peon.enter()
 
                 address_ok = address_multi_ok = None

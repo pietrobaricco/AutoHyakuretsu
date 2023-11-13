@@ -11,14 +11,14 @@ from macros.aplan.libs.aplan import aplan_utils
 class offer_add_line(Macro):
 
     def get_required_parameters(self):
-        return ["product_code", "product_name", "quantity", "excluded_rows"]
+        return ["product_code", "product_name", "quantity", "excluded_rows", "margin_percent"]
 
     def run(self, screenshot_cv, parameters={}):
 
         excluded_rows = parameters['excluded_rows'] or [] if 'excluded_rows' in parameters else []
         parameters['excluded_rows'] = excluded_rows
 
-        ok_marker = self.search_template("asterisk-green", screenshot_cv)
+        ok_marker, screenshot_cv = self.wait_for_template("asterisk-green")
         if ok_marker:
             print("Search article Ready")
             # click on the search field
@@ -51,7 +51,7 @@ class offer_add_line(Macro):
                         print("Article blocked")
                         self.app.peon.ESC()
                         excluded_rows.append(matching_address)
-                        if(len(articles) > len(excluded_rows)):
+                        if (len(articles) > len(excluded_rows)):
                             parameters['excluded_rows'] = excluded_rows
                             print("Retry with new parameters")
                             return self.run(screenshot_cv, parameters)
@@ -64,10 +64,28 @@ class offer_add_line(Macro):
                 self.app.peon.right()
 
             self.app.peon.write_text(parameters['quantity'])
-            self.app.peon.enter()
+            #            self.app.peon.enter()
+
+            # Margin
+            for i in range(7):
+                self.app.peon.right()
+            if parameters['margin_percent'] != "n/a":
+                self.app.peon.write_text(parameters['margin_percent'])
+            #               self.app.peon.enter()
+
+            # NCNR
+            for i in range(5):
+                self.app.peon.right()
+            self.app.peon.space()
+
+            NonBlockingDelay.wait(500)
+
+
+            self.app.click(ok_marker['x'] + 200, ok_marker['y'] + 100)
+
+            NonBlockingDelay.wait(500)
 
             self.app.peon.down()
-            self.app.click(ok_marker['x'] + 200, ok_marker['y'] + 100)
         else:
             print("Search article not Ready")
 

@@ -2,6 +2,7 @@ import sys
 
 import pyautogui
 from PyQt5.QtCore import QTimer
+import pyperclip
 from pywinauto.keyboard import send_keys
 
 from libs.delay import NonBlockingDelay
@@ -13,7 +14,11 @@ class Peon:
         self.is_win = sys.platform.startswith('win')
 
     def write_text(self, text, interval=0.1, wait_ms=0):
-        pyautogui.typewrite(text, interval=interval)
+        pyperclip.copy(text)
+        NonBlockingDelay.wait(200)
+        pyautogui.hotkey('ctrl', 'v', interval=0.1)
+        #pyautogui.typewrite(text, interval=interval)
+        NonBlockingDelay.wait(100)
         NonBlockingDelay.wait(wait_ms)
 
     def enter(self):
@@ -21,6 +26,12 @@ class Peon:
             send_keys('{ENTER}')
         else:
             pyautogui.press('enter')
+
+    def space(self):
+        if self.is_win:
+            send_keys('{SPACE}')
+        else:
+            pyautogui.press('space')
 
     def backspace(self):
         if self.is_win:
@@ -87,3 +98,21 @@ class Peon:
             send_keys('+%{F5}')
         else:
             pyautogui.hotkey('shift', 'alt', 'f5')
+
+    def alt_8(self):
+        if self.is_win:
+            send_keys('%8')
+        else:
+            pyautogui.hotkey('alt', '8')
+
+    def alt_q(self):
+        if self.is_win:
+            send_keys('%q')
+        else:
+            pyautogui.hotkey('alt', 'q')
+
+    def ctrl_a(self):
+        if self.is_win:
+            send_keys('^a')
+        else:
+            pyautogui.hotkey('ctrl', 'a')
