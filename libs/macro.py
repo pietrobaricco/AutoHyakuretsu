@@ -3,11 +3,14 @@ import time
 from abc import abstractmethod, ABC
 
 import pyautogui
-from PyQt5.QtCore import QTimer
+
+from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtWidgets import QDialog
 
 from libs.capture import get_matches, capture_screen
 from libs.delay import NonBlockingDelay
 from libs.png_templates import Template, load_templates
+from ui.askPause import Ui_AskPauseWindow
 
 
 class Macro(ABC):
@@ -23,6 +26,21 @@ class Macro(ABC):
     @abstractmethod
     def run(self, screenshot_cv, parameters={}):
         pass
+
+    def pause(self, message):
+        dialog_window = Ui_AskPauseWindow()
+
+        dialog = QDialog()
+        dialog.setWindowFlags(dialog.windowFlags() | Qt.WindowStaysOnTopHint)
+        dialog_window.setupUi(dialog)
+
+        dialog_window.message_browser.setText(message)
+        dialog_window.resume_button.clicked.connect(dialog.accept)
+        dialog_window.terminate_button.clicked.connect(dialog.reject)
+
+        result = dialog.exec_()
+
+        return result == QDialog.Accepted
 
     def get_required_parameters(self):
         return []
@@ -53,7 +71,7 @@ class Macro(ABC):
         m = self.get_first_match(matches1, name)
         return m
 
-    def wait_for_template(self, name, timeout=60):
+    def wait_for_template(self, name, timeout=15):
         total_time = 0
         while total_time < timeout:
             screenshot_cv = capture_screen(delay_ms=500)
@@ -62,7 +80,11 @@ class Macro(ABC):
                 return m, screenshot_cv
             total_time += 0.5
             print("Waiting for " + name + "...")
-        return None, screenshot_cv
+
+        if self.pause("Template " + name + " not found. Continue?"):
+            return self.wait_for_template(name, timeout)
+        else:
+            raise TerminatedError("Template " + name + " not found")
 
 
 def search_macros(directory):
@@ -80,3 +102,9 @@ def search_macros(directory):
                 module_name = directory
                 macros.append({"name": macro_name, "module": module_name})
     return macros
+
+
+class TerminatedError(Exception):
+    def __init__(self, message="Macro terminated by user"):
+        self.message = message
+        super().__init__(self.message)

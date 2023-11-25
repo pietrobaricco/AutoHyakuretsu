@@ -15,13 +15,12 @@ from libs.ai import bot
 from libs.capture import capture_screen, ocr_utils
 from libs.delay import NonBlockingDelay
 from libs.image import imageManipulator
-from libs.macro import search_macros, Macro
+from libs.macro import search_macros, Macro, TerminatedError
 from libs.peon import Peon
 from libs.sprite import load_sprites
 from ui import chatLogWindow
 from ui.mainWindow import Ui_MainWindow
 from ui.chatLogWindow import Ui_ChatLogWindow
-
 
 class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
     macros: dict[str, Macro] = []
@@ -333,7 +332,11 @@ class AutoHyakuretsu(QMainWindow, Ui_MainWindow):
 
         parameters = macro.get_required_parameters()
         if len(parameters) == 0:
-            macro.run(capture_screen(), {})
+            try:
+                macro.run(capture_screen(), {})
+            except TerminatedError as te:
+                print(f"Terminated: {te}")
+
             window.close()
             return
 
@@ -460,6 +463,10 @@ class CheckBoxCellWidget(QWidget):
 
 class StartStopButton(QPushButton):
     macro: Macro = None
+
+    # some constants
+    START = 0
+    STOP = 1
 
     def __init__(self, macro: Macro, app):
         super().__init__()
