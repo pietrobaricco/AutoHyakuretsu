@@ -70,7 +70,15 @@ class address_search(Macro):
                 self.app.peon.enter()
 
                 address_ok = address_multi_ok = None
+                retries = 0
                 while not (address_ok or address_multi_ok):
+                    retries += 1
+                    if(retries > 10):
+                        if self.pause("Address not found. Search for the address manually and press resume when done"):
+                            break
+                        else:
+                            return False
+
                     address_ok, screenshot_cv = self.wait_for_template("address-page-ok", 1, False)
                     address_multi_ok, screenshot_cv = self.wait_for_template("address-search-multi", 1, False)
 
