@@ -71,8 +71,8 @@ class address_search(Macro):
 
                 address_ok = address_multi_ok = None
                 while not (address_ok or address_multi_ok):
-                    address_ok, screenshot_cv = self.wait_for_template("address-page-ok", 1)
-                    address_multi_ok, screenshot_cv = self.wait_for_template("address-search-multi", 1)
+                    address_ok, screenshot_cv = self.wait_for_template("address-page-ok", 1, False)
+                    address_multi_ok, screenshot_cv = self.wait_for_template("address-search-multi", 1, False)
 
                 if address_multi_ok:
                     print("Found multiple addresses")

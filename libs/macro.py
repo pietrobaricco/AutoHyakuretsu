@@ -71,7 +71,7 @@ class Macro(ABC):
         m = self.get_first_match(matches1, name)
         return m
 
-    def wait_for_template(self, name, timeout=15):
+    def wait_for_template(self, name, timeout=15, pause_on_timeout=True):
         total_time = 0
         while total_time < timeout:
             screenshot_cv = capture_screen(delay_ms=500)
@@ -81,11 +81,13 @@ class Macro(ABC):
             total_time += 0.5
             print("Waiting for " + name + "...")
 
-        if self.pause("Template " + name + " not found. Continue?"):
-            return self.wait_for_template(name, timeout)
-        else:
-            raise TerminatedError("Template " + name + " not found")
+        if pause_on_timeout:
+            if self.pause("Template " + name + " not found. Continue?"):
+                return self.wait_for_template(name, timeout)
+            else:
+                raise TerminatedError("Template " + name + " not found")
 
+        return None, screenshot_cv
 
 def search_macros(directory):
     macros = []
