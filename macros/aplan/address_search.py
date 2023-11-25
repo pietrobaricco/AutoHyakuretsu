@@ -74,7 +74,7 @@ class address_search(Macro):
                 while not (address_ok or address_multi_ok):
                     retries += 1
                     if(retries > 10):
-                        if self.pause("Address not found. Search for the address manually and press resume when done"):
+                        if self.pause("Company not found. Select one manually and press resume when done"):
                             break
                         else:
                             return False
