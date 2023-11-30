@@ -64,7 +64,7 @@ class new_offer(Macro):
     def extract_address(self, screenshot_cv, originatorObj):
         aplan = aplan_utils(self)
 
-        m = self.search_template("address-search-multi-popup-1", screenshot_cv)
+        m, screenshot_cv = self.wait_for_template("address-search-multi-popup-1")
 
         if m:
             print("Found contact list popup")
