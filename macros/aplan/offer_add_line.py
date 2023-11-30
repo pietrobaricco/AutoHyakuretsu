@@ -27,15 +27,17 @@ class offer_add_line(Macro):
             # click outside the search field
             self.app.click(ok_marker['x'] + 200, ok_marker['y'] + 100)
 
-            screenshot_cv = capture_screen(delay_ms=2000)
+            free_article = select_article = new_ok_marker = None
+            while not (free_article or select_article or new_ok_marker):
+                free_article, screenshot_cv = self.wait_for_template("create-free-article", 1, False)
+                select_article, screenshot_cv = self.wait_for_template("select-article", 1, False)
+                new_ok_marker, screenshot_cv = self.wait_for_template("asterisk-green", 1, False)
 
-            free_article = self.search_template("create-free-article", screenshot_cv)
             if free_article:
                 print("Skip free article creation: article does not exist")
                 self.app.peon.alt_n()
                 return False
 
-            select_article = self.search_template("select-article", screenshot_cv)
             if select_article:
                 print("Multiple SKUs found")
                 matching_address, funnel_pos, articles = self.extract_sku(screenshot_cv, parameters)
