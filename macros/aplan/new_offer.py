@@ -30,8 +30,8 @@ class new_offer(Macro):
 
             select_contact = offer_ready = None
             while not (select_contact or offer_ready):
-                select_contact, screenshot_cv = self.wait_for_template("select-contact-person", 1)
-                offer_ready, screenshot_cv = self.wait_for_template("offer-ready", 1)
+                select_contact, screenshot_cv = self.wait_for_template("select-contact-person", 1, False)
+                offer_ready, screenshot_cv = self.wait_for_template("offer-ready", 1, False)
 
             # esce un popup di anagrafiche, deve selezionare quello più probabile come mittente della mail nome e cognome:
             if select_contact:
