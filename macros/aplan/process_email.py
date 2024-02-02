@@ -29,7 +29,7 @@ class process_email(Macro):
                 Your task is to extract structured data from the email below and return it as JSON. 
                 Make sure to strictly follow instructions and return only JSON data, don't add any extra text as your answer must be in JSON format.
                 
-                Details about how to extract the names:                
+                Details about how to extract the data:                
                 
                 * sender_company_name:
                     If the email has a signature section, use the name as provided in the signature. Otherwise, infer it from the sender email address.
@@ -85,24 +85,35 @@ class process_email(Macro):
             if response:
                 data = json.loads(response)
                 if data:
-                    address = self.app.macros['aplan.address_search'].run(screenshot_cv, {
-                        "name": data['sender_company_name_main_keyword'],
-                        "address": data['sender_address'],
-                        "town": data['sender_city'],
-                        "phone_no": data['sender_phone']
-                    })
-                    if address:
+                    if False:
+                        company_found = self.app.macros['aplan.address_search'].run(screenshot_cv, {
+                            "name": data['sender_company_name_main_keyword'],
+                            "address": data['sender_address'],
+                            "town": data['sender_city'],
+                            "phone_no": data['sender_phone']
+                        })
+                    else:
+                        company_found = self.app.macros['aplan.person_search'].run(screenshot_cv, {
+                            "first_name": data['sender_name'],
+                            "last_name": data['sender_last_name'],
+                            "email": data['sender_email'],
+                            "company_name": data['sender_company_name_main_keyword'],
+                        })
+                    if company_found:
                         m, screenshot_cv = self.wait_for_template("article-history-button")
                         self.search_and_click("article-history-button", screenshot_cv)
 
                         m, screenshot_cv = self.wait_for_template("article-search-page-marker")
 
+                        line_nr = 0
                         for line_item in data['quote_request']['line_items']:
+                            line_nr += 1
                             if line_item['product_code'] and int(line_item['product_code'][0:3]) in valid_prefixes:
 
                                 margin = self.app.macros['aplan.article_history'].run(screenshot_cv, {
                                     "article_number": line_item['product_code'],
-                                    "quantity": line_item['product_quantity']
+                                    "quantity": line_item['product_quantity'],
+                                    "line_nr": line_nr
                                 })
 
                                 print ("Margin for " + line_item['product_code'] + " is " + str(margin['margin']))
@@ -150,7 +161,9 @@ class process_email(Macro):
                             #self.search_and_click("offer-cp-update-button", screenshot_cv)
                             #NonBlockingDelay.wait(10000)
 
-                            today_it = datetime.datetime.now().strftime("%d/%m/%Y")
+
+                            today_it = datetime.datetime.now().strftime("%d/%m/%y")
+
                             self.app.macros['aplan.offer_fill_fields'].run(screenshot_cv, {
                                 "fu_status": "MaBar",
                                 "contact2": "C",

@@ -21,8 +21,11 @@ class article_history(Macro):
         m = self.search_template("table-marker-minimal", screenshot_cv)
 
         today = datetime.datetime.now().strftime("%d/%m/%Y")
-        aplan.filter_table_by('[A,B]', screenshot_cv, "document-no-table-header", m['x'], m['y'], parse=False, clear_if_no_result=False)
-        aplan.filter_table_by("<" + today, screenshot_cv, "date-table-header", m['x'], m['y'], parse=False, clear_if_no_result=False)
+
+        if parameters['line_nr'] == 1:
+            aplan.filter_table_by('[A,B]', screenshot_cv, "document-no-table-header", m['x'], m['y'], parse=False, clear_if_no_result=False)
+            aplan.filter_table_by("<" + today, screenshot_cv, "date-table-header", m['x'], m['y'], parse=False, clear_if_no_result=False)
+
         rows, cols, funnel_pos = aplan.filter_table_by(parameters['article_number'], screenshot_cv, "part-number-table-header", m['x'], m['y'], clear_if_no_result=False)
 
         response = None

@@ -25,13 +25,16 @@ class offer_add_line(Macro):
             self.app.click(ok_marker['x'] + 60, ok_marker['y'])
             self.app.peon.write_text(parameters['product_code'], interval=0.02, wait_ms=0)
             # click outside the search field
-            self.app.click(ok_marker['x'] + 200, ok_marker['y'] + 100)
+            #self.app.click(ok_marker['x'] + 200, ok_marker['y'] + 100)
+            self.app.peon.down()
 
             free_article = select_article = new_ok_marker = None
             while not (free_article or select_article or new_ok_marker):
-                free_article, screenshot_cv = self.wait_for_template("create-free-article", 1, False)
-                select_article, screenshot_cv = self.wait_for_template("select-article", 1, False)
                 new_ok_marker, screenshot_cv = self.wait_for_template("asterisk-green", 1, False)
+                if not new_ok_marker:
+                    select_article, screenshot_cv = self.wait_for_template("select-article", 1, False)
+                if not select_article:
+                    free_article, screenshot_cv = self.wait_for_template("create-free-article", 1, False)
 
             if free_article:
                 print("Skip free article creation: article does not exist")
@@ -40,26 +43,32 @@ class offer_add_line(Macro):
 
             if select_article:
                 print("Multiple SKUs found")
-                matching_address, funnel_pos, articles = self.extract_sku(screenshot_cv, parameters)
-                if matching_address['row_number'] is not None:
-                    row_nr_int = int(matching_address['row_number'])
-                    self.app.click(funnel_pos['x'] + 100, funnel_pos['y'] + 10 + 16 * row_nr_int)
-                    NonBlockingDelay.wait(30)
+
+                if False:
+                    matching_address, funnel_pos, articles = self.extract_sku(screenshot_cv, parameters)
+                    if matching_address['row_number'] is not None:
+                        row_nr_int = int(matching_address['row_number'])
+                        self.app.click(funnel_pos['x'] + 100, funnel_pos['y'] + 10 + 16 * row_nr_int)
+                        NonBlockingDelay.wait(30)
+                        self.app.peon.enter()
+                else:
+                    print("Press ENTER, which equates to selecting the first article in the list")
                     self.app.peon.enter()
 
-                    screenshot_cv = capture_screen(delay_ms=2000)
-                    blocked = self.search_template("article-blocked", screenshot_cv)
-                    if blocked:
-                        print("Article blocked")
-                        self.app.peon.ESC()
-                        excluded_rows.append(matching_address)
-                        if (len(articles) > len(excluded_rows)):
-                            parameters['excluded_rows'] = excluded_rows
-                            print("Retry with new parameters")
-                            return self.run(screenshot_cv, parameters)
-                        return False
+                screenshot_cv = capture_screen(delay_ms=2000)
+                blocked = self.search_template("article-blocked", screenshot_cv)
+                if blocked:
+                    print("Article blocked")
+                    self.app.peon.ESC()
+                    excluded_rows.append(matching_address)
+                    if (len(articles) > len(excluded_rows)):
+                        parameters['excluded_rows'] = excluded_rows
+                        print("Retry with new parameters")
+                        return self.run(screenshot_cv, parameters)
+                    return False
 
             self.app.click(ok_marker['x'] + 60, ok_marker['y'])
+            NonBlockingDelay.wait(200)
             print("Article selected")
 
             for i in range(3):
@@ -82,11 +91,11 @@ class offer_add_line(Macro):
 
             NonBlockingDelay.wait(500)
 
-
             self.app.click(ok_marker['x'] + 200, ok_marker['y'] + 100)
 
             NonBlockingDelay.wait(500)
 
+            print("Line added, pressing ENTER to confirm and make the next line ready for search")
             self.app.peon.down()
         else:
             print("Search article not Ready")

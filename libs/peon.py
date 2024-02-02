@@ -81,6 +81,12 @@ class Peon:
         else:
             pyautogui.press('esc')
 
+    def alt_tab(self):
+        if self.is_win:
+            send_keys('%{TAB}')
+        else:
+            pyautogui.hotkey('alt', 'tab')
+
     def alt_n(self):
         if self.is_win:
             send_keys('%n')
@@ -92,6 +98,12 @@ class Peon:
             send_keys('%{F2}')
         else:
             pyautogui.hotkey('alt', 'f2')
+
+    def ctrl_f2(self):
+        if self.is_win:
+            send_keys('^{F2}')
+        else:
+            pyautogui.hotkey('ctrl', 'f2')
 
     def shift_alt_f5(self):
         if self.is_win:
@@ -116,3 +128,21 @@ class Peon:
             send_keys('^a')
         else:
             pyautogui.hotkey('ctrl', 'a')
+
+    def ctrl_c(self):
+        if self.is_win:
+            send_keys('^c')
+        else:
+            pyautogui.hotkey('ctrl', 'c')
+
+    def ctrl_v(self):
+        if self.is_win:
+            send_keys('^v')
+        else:
+            pyautogui.hotkey('ctrl', 'v')
+
+    def ctrl_left(self):
+        if self.is_win:
+            send_keys('^{LEFT}')
+        else:
+            pyautogui.hotkey('ctrl', 'left')

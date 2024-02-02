@@ -109,7 +109,7 @@ class bot:
             "config_list": config_list,
             "temperature": 0.1,
             # timeout in seconds
-            "request_timeout": 360,
+            "timeout": 600,
         }
         bot = autogen.AssistantAgent(
             name="bot",
@@ -120,13 +120,16 @@ class bot:
             name="user_proxy",
             human_input_mode="NEVER",
             # return true if content is valid json
-            is_termination_msg=lambda x: json.loads(x.get("content", ""))
+            is_termination_msg=lambda x: json.loads(x.get("content", "")),
+            code_execution_config={
+                "use_docker": False,  # Please set use_docker=True if docker is available to run the generated code. Using docker is safer than running the generated code directly.
+            }
         )
 
         # the purpose of the following line is to log the conversation history
-        autogen.ChatCompletion.start_logging()
+        #autogen.ChatCompletion.start_logging()
         ret = user_proxy.initiate_chat(bot, message=question)
-        log = autogen.ChatCompletion.logged_history
+        #log = autogen.ChatCompletion.logged_history
 
         ret = user_proxy.last_message()["content"]
         self.chat_log.append({"question": question, "answer": ret})

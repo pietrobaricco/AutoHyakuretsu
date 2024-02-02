@@ -2,6 +2,8 @@ import re
 
 import cv2
 import tesserocr
+import pyperclip
+import pyautogui
 
 from libs.capture import capture_screen
 from libs.delay import NonBlockingDelay
@@ -14,8 +16,7 @@ class aplan_utils:
     def __init__(self, macro):
         self.macro = macro
 
-    def get_table_rows(self, screen_img, fx, fy, fx1, fy1, row_height=16):
-        ret = []
+    def get_table_headers(self, screen_img, fx, fy, fx1, fy1, row_height=16):
         columns = []
         row_width = screen_img.shape[1]
 
@@ -48,7 +49,7 @@ class aplan_utils:
             separators = matches.get("headers-separator", [])
             # include also the second separator
             separators.extend(matches.get("headers-separator-2", []))
-            #remove separators with y > offset (found somewhere else)
+            # remove separators with y > offset (found somewhere else)
             separators = [s for s in separators if s['y'] < headers_overscan_px]
 
             if (len(separators) == 0):
@@ -81,7 +82,7 @@ class aplan_utils:
                 x = offsets[i]
                 x1 = offsets[i + 1]
                 header_img = screen_img[headers_y:headers_y + int(row_height * headers_height_multiplier), x:x1]
-                if(header_img.shape[0] == 0 or header_img.shape[1] == 0):
+                if (header_img.shape[0] == 0 or header_img.shape[1] == 0):
                     continue
                 # threshold and upscale header_img so that gray text becomes white, and sort controls are removed
 
@@ -103,44 +104,99 @@ class aplan_utils:
             # print columns as json
             print("Columns:", columns)
 
-            # find
-            row = 1  # start from row 1, as row 0 contains the filters
-            while True:
+            return columns, {"x": start_x, "y": start_y}
 
-                box_x = start_x
-                box_y = start_y + row_height * row
-                box_x1 = start_x + row_width
-                box_y1 = start_y + row_height * (row + 1)
+    def get_table_rows(self, screen_img, fx, fy, fx1, fy1, row_height=16):
+        ret = []
 
-                row_img = screen_img[box_y:box_y1, box_x:box_x1]
-                # cycle columns, ocr each cell
-                record = {}
-                good_finds = 0
-                for i in range(len(columns) - 1):
-                    col = columns[i]
-                    cell_x = col["offset"] - box_x
-                    cell_x1 = columns[i + 1]["offset"] - box_x
-                    cell_img = row_img[0:row_height-1, cell_x+1:cell_x1-1]
-                    if cell_img.shape[0] == 0 or cell_img.shape[1] == 0:
-                        continue
+        columns, funnel_pos = self.get_table_headers(screen_img, fx, fy, fx1, fy1, row_height)
 
-                    cell_text, cell_confidence = self.macro.app.ocr_utils.ocr(cell_img, 0, 0, cell_img.shape[1],
-                                                                              cell_img.shape[0], psm=tesserocr.PSM.SINGLE_LINE, threshold=0)
-                    cell_text = re.sub(r'[^a-zA-Z0-9-%/\.,]+', '', cell_text)
+        start_x = funnel_pos['x']
+        start_y = funnel_pos['y']
+        row_width = screen_img.shape[1]
 
-                    if (cell_confidence > 70):
-                        good_finds += 1
-                    record[col["text"]] = cell_text
+        # find
+        row = 1  # start from row 1, as row 0 contains the filters
+        while True:
+            box_x = start_x
+            box_y = start_y + row_height * row
+            box_x1 = start_x + row_width
+            box_y1 = start_y + row_height * (row + 1)
 
-                if (good_finds < 3):
-                    break
+            row_img = screen_img[box_y:box_y1, box_x:box_x1]
+            # cycle columns, ocr each cell
+            record = {}
+            good_finds = 0
+            for i in range(len(columns) - 1):
+                col = columns[i]
+                cell_x = col["offset"] - box_x
+                cell_x1 = columns[i + 1]["offset"] - box_x
+                cell_img = row_img[0:row_height-1, cell_x+1:cell_x1-1]
+                if cell_img.shape[0] == 0 or cell_img.shape[1] == 0:
+                    continue
 
-                ret.append(record)
-                row += 1
+                cell_text, cell_confidence = self.macro.app.ocr_utils.ocr(cell_img, 0, 0, cell_img.shape[1],
+                                                                          cell_img.shape[0], psm=tesserocr.PSM.SINGLE_LINE, threshold=0)
+                cell_text = re.sub(r'[^a-zA-Z0-9-%/\.,]+', '', cell_text)
 
-            print("Found", row - 1, "rows")
+                if (cell_confidence > 70):
+                    good_finds += 1
+                record[col["text"]] = cell_text
 
-            return ret, columns, {"x": start_x, "y": start_y}
+            if (good_finds < 3):
+                break
+
+            ret.append(record)
+            row += 1
+
+        print("Found", row - 1, "rows")
+
+        return ret, columns, {"x": start_x, "y": start_y}
+
+    def get_table_rows_with_clipboard(self, screen_img, fx, fy, fx1, fy1):
+        ret = []
+
+        columns, funnel_pos = self.get_table_headers(screen_img, fx, fy, fx1, fy1)
+
+        # click on the first cell to select the entire table
+        self.macro.app.click(funnel_pos['x'] + 5, funnel_pos['y'] + 5)
+
+        # open a notepad
+        #self.macro.app.macros['windows.run_program'].run(screen_img, {
+        #    "search_string": "Blocco",
+        #})
+
+        #self.macro.app.peon.alt_tab()
+
+        # find
+        row = 1  # start from row 1, as row 0 contains the filters
+
+        delay = 500
+        prev_row = None
+        while True:
+            # cycle columns, copy each cell
+            record = {}
+
+            for i in range(len(columns) - 1):
+                col = columns[i]
+
+                self.macro.app.peon.ctrl_c()
+                #NonBlockingDelay.wait(delay)
+                record[col["text"]] = pyperclip.paste()
+
+                self.macro.app.peon.right()
+
+            if prev_row == record or row > 2:
+                break
+
+            ret.append(record)
+            row += 1
+            self.macro.app.peon.down()
+            self.macro.app.peon.ctrl_left()
+
+        print("Found", row - 1, "rows")
+
+        return ret, columns, funnel_pos
 
     def filter_table_by(self, value, screen_img, header_template, table_x, table_y, x_offset=0, parse=True, clear_before=True, clear_if_no_result=True):
 
@@ -157,7 +213,7 @@ class aplan_utils:
                 self.macro.app.peon.ctrl_a()
                 NonBlockingDelay.wait(200)
                 self.macro.app.peon.backspace()
-                NonBlockingDelay.wait(200)
+                NonBlockingDelay.wait(500)
 
             self.macro.app.peon.write_text(value, interval=0.02, wait_ms=200)
             self.macro.app.peon.enter()
